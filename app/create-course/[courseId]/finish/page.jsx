@@ -1,8 +1,5 @@
 "use client";
-import { db } from "@/configs/db";
-import { CourseList } from "@/configs/schema";
 import { useUser } from "@clerk/nextjs";
-import { and, eq } from "drizzle-orm";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import CourseBasicInfo from "../_components/CourseBasicInfo";
@@ -39,16 +36,18 @@ function FinishScreen({ params }) {
   const GetCourse = async () => {
     try {
       const params = await Params;
-      const result = await db
-        .select()
-        .from(CourseList)
-        .where(
-          and(
-            eq(CourseList.courseId, Params?.courseId),
-            eq(CourseList?.createdBy, user?.primaryEmailAddress?.emailAddress)
-          )
-        );
-      if (result[0]?.publish == false) {
+      const response = await fetch(
+        `/api/courses/${params?.courseId}?createdBy=${encodeURIComponent(
+          user?.primaryEmailAddress?.emailAddress || ""
+        )}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch course");
+      }
+
+      const result = await response.json();
+      if (result?.publish == false) {
         router.replace("/create-course/" + params?.courseId);
         toast({
           variant: "destructive",
@@ -58,9 +57,9 @@ function FinishScreen({ params }) {
         });
         return;
       }
-      setCourse(result[0]);
+      setCourse(result);
       setLoading(false);
-      // console.log("Course data:", result[0]);
+      // console.log("Course data:", result);
     } catch (error) {
       // console.error("Error fetching course:", error);
       toast({

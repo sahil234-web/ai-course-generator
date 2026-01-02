@@ -3,16 +3,6 @@ import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { HiOutlinePuzzle } from "react-icons/hi";
 import EditCourseBasicInfo from "./EditCourseBasicInfo";
-import { storage } from "@/configs/firebaseConfig";
-import {
-  deleteObject,
-  getDownloadURL,
-  ref,
-  uploadBytes,
-} from "firebase/storage";
-import { db } from "@/configs/db";
-import { CourseList } from "@/configs/schema";
-import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,28 +13,23 @@ function CourseBasicInfo({ course, refreshData, edit = true }) {
   const onFileChanged = async (e) => {
     try {
       const file = e.target.files[0];
+      if (!file) return;
+
       setSelectedFile(URL.createObjectURL(file));
 
-      // Delete Previous Image
-      if (course?.courseBanner != "/placeholder.png") {
-        const filePath = course?.courseBanner
-          .replace(
-            "https://firebasestorage.googleapis.com/v0/b/explorer-1844f.firebasestorage.app/o/",
-            ""
-          )
-          .split("?")[0];
-        const fileRef = ref(storage, decodeURIComponent(filePath));
+      const formData = new FormData();
+      formData.append("file", file);
 
-        await deleteObject(fileRef);
-        // console.log("Previous Image Deleted");
+      const response = await fetch(`/api/courses/${course?.courseId}/banner`, {
+        method: "PUT",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to upload banner");
       }
 
-      // Upload new image in storage
-      const fileName = Date.now() + file.name;
-      const storageRef = ref(storage, "ai-course/" + fileName);
-
-      const snapshot = await uploadBytes(storageRef, file);
-      // console.log("Uploaded Completed!");
       toast({
         variant: "success",
         duration: 3000,
@@ -52,14 +37,6 @@ function CourseBasicInfo({ course, refreshData, edit = true }) {
         description: "Image has been uploaded successfully.",
       });
 
-      const imageLink = await getDownloadURL(storageRef);
-      // console.log("Image Link Generated!", imageLink);
-
-      const result = await db
-        .update(CourseList)
-        .set({ courseBanner: imageLink })
-        .where(eq(CourseList.id, course?.id));
-      // console.log(result);
       refreshData(true);
     } catch (error) {
       // console.log(error);

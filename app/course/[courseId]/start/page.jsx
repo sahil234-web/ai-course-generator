@@ -5,9 +5,6 @@ import { HiChevronDoubleLeft } from "react-icons/hi";
 import ChapterListCard from "./_components/ChapterListCard";
 import ChapterContent from "./_components/ChapterContent";
 import React, { useState, useEffect } from "react";
-import { db } from "@/configs/db";
-import { Chapters, CourseList } from "@/configs/schema";
-import { and, eq } from "drizzle-orm";
 import { useToast } from "@/hooks/use-toast";
 
 function CourseStart({ params }) {
@@ -43,15 +40,15 @@ function CourseStart({ params }) {
   const GetCourse = async () => {
     setCourseLoading(true);
     try {
-      const result = await db
-        .select()
-        .from(CourseList)
-        .where(eq(CourseList.courseId, Params?.courseId));
+      const params = await Params;
+      const response = await fetch(`/api/courses/${params?.courseId}`);
 
-      if (result.length > 0) {
-        const fetchedCourse = result[0];
-        setCourse(fetchedCourse);
+      if (!response.ok) {
+        throw new Error("Failed to fetch course");
       }
+
+      const fetchedCourse = await response.json();
+      setCourse(fetchedCourse);
     } catch (error) {
       // console.error(error);
       toast({
@@ -68,16 +65,15 @@ function CourseStart({ params }) {
   const GetSelectedChapterContent = async (chapterId) => {
     setContentLoading(true);
     try {
-      const result = await db
-        .select()
-        .from(Chapters)
-        .where(
-          and(
-            eq(Chapters.courseId, course?.courseId),
-            eq(Chapters.chapterId, chapterId)
-          )
-        );
+      const response = await fetch(
+        `/api/chapters?courseId=${course?.courseId}&chapterId=${chapterId}`
+      );
 
+      if (!response.ok) {
+        throw new Error("Failed to fetch chapter content");
+      }
+
+      const result = await response.json();
       if (result.length > 0) {
         setSelectedChapterContent(result[0]);
       }

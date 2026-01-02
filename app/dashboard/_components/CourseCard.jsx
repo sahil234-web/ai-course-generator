@@ -2,11 +2,6 @@ import Image from "next/image";
 import React from "react";
 import { HiOutlineBookOpen, HiEllipsisVertical } from "react-icons/hi2";
 import DropdownOption from "./DropdownOption";
-import { db } from "@/configs/db";
-import { Chapters, CourseList } from "@/configs/schema";
-import { eq } from "drizzle-orm";
-import { deleteObject, ref } from "firebase/storage";
-import { storage } from "@/configs/firebaseConfig";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -17,45 +12,22 @@ function CourseCard({ course, refreshData, displayUser = false }) {
     try {
       // console.log("Course : " + course?.courseId);
 
-      // Delete Banner Image
-      if (course?.courseBanner != "/placeholder.png") {
-        const filePath = course?.courseBanner
-          .replace(
-            "https://firebasestorage.googleapis.com/v0/b/explorer-1844f.firebasestorage.app/o/",
-            ""
-          )
-          .split("?")[0];
-        const fileRef = ref(storage, decodeURIComponent(filePath));
+      const response = await fetch(`/api/courses/${course?.courseId}`, {
+        method: "DELETE",
+      });
 
-        await deleteObject(fileRef);
-        // console.log("Image Deleted");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete course");
       }
 
-      // Delete Course
-      const courseResponse = await db
-        .delete(CourseList)
-        .where(eq(CourseList.id, course?.id))
-        .returning({ id: CourseList?.id });
-
-      // console.log("Course Deleted : " + courseResponse);
-
-      // Delete Chapters
-      const chapterResponse = await db
-        .delete(Chapters)
-        .where(eq(Chapters.courseId, course?.courseId))
-        .returning({ id: Chapters?.id });
-
-      // console.log("Chapters Deleted : " + chapterResponse);
-
-      if (courseResponse && chapterResponse) {
-        refreshData();
-        toast({
-          variant: "success",
-          duration: 3000,
-          title: "Course Deleted Successfully!",
-          description: "Course has been deleted successfully!",
-        });
-      }
+      refreshData();
+      toast({
+        variant: "success",
+        duration: 3000,
+        title: "Course Deleted Successfully!",
+        description: "Course has been deleted successfully!",
+      });
     } catch (error) {
       // console.log("Error during deletion : " + error);
       toast({

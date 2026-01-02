@@ -1,10 +1,7 @@
 "use client";
-import { db } from "@/configs/db";
-import { CourseList } from "@/configs/schema";
 import React, { useEffect, useState } from "react";
 import CourseCard from "../_components/CourseCard";
 import { Button } from "@/components/ui/button";
-import { desc, eq } from "drizzle-orm";
 import { useToast } from "@/hooks/use-toast";
 
 function Explore() {
@@ -17,18 +14,14 @@ function Explore() {
   }, []); // set dependency array value to pageIndex
 
   const GetAllCourses = async () => {
-    // const result = await db
-    //   .select()
-    //   .from(CourseList)
-    //   .limit(9)
-    //   .offset(pageIndex * 9);
-
     try {
-      const result = await db
-        .select()
-        .from(CourseList)
-        .where(eq(CourseList.publish, true))
-        .orderBy(desc(CourseList.id));
+      const response = await fetch("/api/courses?publish=true");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch courses");
+      }
+
+      const result = await response.json();
       // console.log(result);
       setCourseList(result);
     } catch (error) {
