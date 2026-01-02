@@ -5,8 +5,32 @@ const isProtectedRoute = createRouteMatcher([
   "/create-course(.*)",
 ]);
 
+// Protected API routes that require authentication
+const isProtectedApiRoute = createRouteMatcher([
+  "/api/courses(.*)", // All course routes
+  "/api/chapters(.*)", // All chapter routes
+  "/api/course/layout", // Course layout generation
+]);
+
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) await auth.protect();
+  // Protect dashboard and create-course routes
+  if (isProtectedRoute(req)) {
+    await auth.protect();
+  }
+
+  // Protect API routes that modify data
+  if (isProtectedApiRoute(req)) {
+    // Allow GET requests to public courses, but protect all other methods
+    const isGetRequest = req.method === "GET";
+    const isPublicCourseGet = 
+      isGetRequest && 
+      (req.nextUrl.pathname.includes("/api/courses/") || 
+       req.nextUrl.pathname.includes("/api/chapters"));
+
+    if (!isPublicCourseGet) {
+      await auth.protect();
+    }
+  }
 });
 
 export const config = {

@@ -1,11 +1,14 @@
 "use client";
 import Skeleton from "react-loading-skeleton"; // Install via: npm install react-loading-skeleton
 import "react-loading-skeleton/dist/skeleton.css"; // Import default styles
-import { HiChevronDoubleLeft } from "react-icons/hi";
+import { HiChevronDoubleLeft, HiArrowLeft } from "react-icons/hi";
+import { HiBars3 } from "react-icons/hi2";
 import ChapterListCard from "./_components/ChapterListCard";
 import ChapterContent from "./_components/ChapterContent";
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
 
 function CourseStart({ params }) {
   const Params = React.use(params);
@@ -91,11 +94,45 @@ function CourseStart({ params }) {
 
   return (
     <div>
+      {/* Navigation Bar */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm border-b">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-4">
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => handleSideBarFunction()}
+              className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Toggle sidebar"
+            >
+              <HiBars3 size={24} className="text-gray-600" />
+            </button>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
+            >
+              <HiArrowLeft size={20} />
+              <span className="hidden sm:inline">Back to Dashboard</span>
+            </Link>
+          </div>
+          <div className="flex items-center gap-4">
+            <h2 className="font-medium text-lg text-gray-800 hidden md:block">
+              {courseLoading ? (
+                <Skeleton width={200} height={24} />
+              ) : (
+                course?.courseOutput?.CourseName
+              )}
+            </h2>
+            <UserButton />
+          </div>
+        </div>
+      </div>
+
       {/* Chapter list Side Bar : LHS */}
       <div
         className={`fixed md:w-72 overflow-scroll bg-white ${
-          handleSidebar ? "block w-80 z-50" : "hidden"
-        } md:block h-screen border-r shadow-sm`}
+          handleSidebar ? "block w-80 z-40" : "hidden"
+        } md:block border-r shadow-sm`}
+        style={{ top: "73px", height: "calc(100vh - 73px)" }}
       >
         <div className="flex bg-primary text-white justify-between p-4 items-center">
           <h2 className="font-medium text-lg">
@@ -138,7 +175,7 @@ function CourseStart({ params }) {
       </div>
 
       {/* Content Div : RHS */}
-      <div className="md:ml-72 p-10">
+      <div className="md:ml-72 p-10" style={{ marginTop: "73px" }}>
         {contentLoading ? (
           <div>
             <Skeleton height={30} width={200} />
