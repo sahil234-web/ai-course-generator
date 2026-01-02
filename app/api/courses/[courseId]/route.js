@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/configs/db";
 import { CourseList, Chapters } from "@/configs/schema";
 import { eq, and } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
 import { deleteObject, ref } from "firebase/storage";
 import { storage } from "@/configs/firebaseConfig";
+import {
+  verifyAuth,
+  verifyAuthAndOwnership,
+  isCoursePublished,
+} from "@/lib/api-security.js";
 
 // GET /api/courses/[courseId] - Get a single course
 export async function GET(req, { params }) {
@@ -19,10 +23,26 @@ export async function GET(req, { params }) {
       .where(eq(CourseList.courseId, courseId));
 
     if (createdBy) {
+      // If filtering by createdBy, verify ownership
+      const authResult = await verifyAuth();
+      if (!authResult || authResult.email !== createdBy) {
+        return NextResponse.json(
+          { error: "Unauthorized: Cannot access other users' courses" },
+          { status: 403 }
+        );
+      }
       query = query.where(
         and(
           eq(CourseList.courseId, courseId),
           eq(CourseList.createdBy, createdBy)
+        )
+      );
+    } else {
+      // Public access - only show published courses
+      query = query.where(
+        and(
+          eq(CourseList.courseId, courseId),
+          eq(CourseList.publish, true)
         )
       );
     }
@@ -46,13 +66,31 @@ export async function GET(req, { params }) {
 // PUT /api/courses/[courseId] - Update a course
 export async function PUT(req, { params }) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const { courseId } = await params;
+
+    // Verify authentication and ownership
+    const { authorized, course, user } = await verifyAuthAndOwnership(courseId);
+
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { courseId } = await params;
+    if (!authorized || !course) {
+      return NextResponse.json(
+        { error: "Forbidden: You don't own this course" },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
+
+    // Prevent changing ownership
+    if (body.createdBy && body.createdBy !== course.createdBy) {
+      return NextResponse.json(
+        { error: "Forbidden: Cannot change course ownership" },
+        { status: 403 }
+      );
+    }
 
     const result = await db
       .update(CourseList)
@@ -77,21 +115,20 @@ export async function PUT(req, { params }) {
 // DELETE /api/courses/[courseId] - Delete a course
 export async function DELETE(req, { params }) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const { courseId } = await params;
+
+    // Verify authentication and ownership
+    const { authorized, course, user } = await verifyAuthAndOwnership(courseId);
+
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { courseId } = await params;
-
-    // First, get the course to check if it has a banner to delete
-    const course = await db
-      .select()
-      .from(CourseList)
-      .where(eq(CourseList.courseId, courseId));
-
-    if (course.length === 0) {
-      return NextResponse.json({ error: "Course not found" }, { status: 404 });
+    if (!authorized || !course) {
+      return NextResponse.json(
+        { error: "Forbidden: You don't own this course" },
+        { status: 403 }
+      );
     }
 
     // Delete banner image from Firebase if it exists

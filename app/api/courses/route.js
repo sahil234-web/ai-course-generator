@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/configs/db";
 import { CourseList } from "@/configs/schema";
 import { desc, eq, and } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
+import { verifyAuth } from "@/lib/api-security.js";
 
 // GET /api/courses - Get all courses (with optional filters)
 export async function GET(req) {
@@ -11,6 +11,17 @@ export async function GET(req) {
     const createdBy = searchParams.get("createdBy");
     const publish = searchParams.get("publish");
     const courseId = searchParams.get("courseId");
+
+    // If filtering by createdBy, verify authentication
+    if (createdBy) {
+      const authResult = await verifyAuth();
+      if (!authResult || authResult.email !== createdBy) {
+        return NextResponse.json(
+          { error: "Unauthorized: Cannot access other users' courses" },
+          { status: 403 }
+        );
+      }
+    }
 
     let query = db.select().from(CourseList);
     const conditions = [];
@@ -24,7 +35,10 @@ export async function GET(req) {
       conditions.push(eq(CourseList.createdBy, createdBy));
     }
 
-    if (publish !== null) {
+    // If no publish filter, only show published courses for public access
+    if (publish === null && !createdBy) {
+      conditions.push(eq(CourseList.publish, true));
+    } else if (publish !== null) {
       const isPublished = publish === "true";
       conditions.push(eq(CourseList.publish, isPublished));
     }
@@ -55,8 +69,8 @@ export async function GET(req) {
 // POST /api/courses - Create a new course
 export async function POST(req) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const authResult = await verifyAuth();
+    if (!authResult) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -80,6 +94,14 @@ export async function POST(req) {
       );
     }
 
+    // Security: Ensure user can only create courses for themselves
+    if (createdBy !== authResult.email) {
+      return NextResponse.json(
+        { error: "Forbidden: Cannot create course for another user" },
+        { status: 403 }
+      );
+    }
+
     const result = await db
       .insert(CourseList)
       .values({
@@ -88,7 +110,7 @@ export async function POST(req) {
         level,
         category,
         courseOutput,
-        createdBy,
+        createdBy: authResult.email, // Use authenticated user's email
         userName,
         includeVideo: includeVideo || "Yes",
         userProfileImage,

@@ -4,7 +4,7 @@ import { CourseList, Chapters } from "@/configs/schema";
 import { eq } from "drizzle-orm";
 import getVideos from "@/configs/service";
 import { AI_MODELS } from "@/configs/aiModels";
-import { verifyAuthAndOwnership } from "@/lib/api-security";
+import { verifyAuthAndOwnership } from "@/lib/api-security.js";
 
 /* ---------- CLEAN MARKDOWN FROM AI ---------- */
 function extractJSON(text) {
